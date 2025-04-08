@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview System</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <!-- ...existing navigation code... -->
+
+    <div class="container mt-5">
+        <h1 class="mb-4">AI Interview System</h1>
+        
+        <!-- Resume Upload Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Upload Resume</h4>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="position" class="form-label">Position</label>
+                        <select class="form-control" id="position" name="position" required>
+                            <option value="">Select Position</option>
+                            <option value="software-engineer">Software Engineer</option>
+                            <option value="product-manager">Product Manager</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="resumeFile" class="form-label">Upload Resume (PDF)</label>
+                        <input type="file" class="form-control" id="resumeFile" name="file" accept=".pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Application</button>
+                </form>
+                <div id="uploadResponse" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Job Listings Section -->
+        <div class="row mb-5" id="jobListingsSection">
+            <!-- ...existing job listings code... -->
+        </div>
+
+        <!-- Application Form Section -->
+        <div class="row" id="applicationSection" style="display: none;">
+            <!-- ...existing application form code... -->
+        </div>
+
+        <!-- Interview Scheduling Section (New) -->
+        <div class="row" id="scheduleSection" style="display: none;">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h3 class="mb-0">Schedule Your Interview</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-success" id="congratsMessage">
+                            <h4 class="alert-heading">Congratulations!</h4>
+                            <p>Your resume has been shortlisted. Please select your preferred interview slot below.</p>
+                        </div>
+                        <div id="calendar"></div>
+                        <div id="availableSlots" class="mt-4">
+                            <h5>Available Time Slots</h5>
+                            <div class="slots-container" id="slotsContainer"></div>
+                        </div>
+                        <div id="schedulingResponse" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interview Details Modal -->
+        <div class="modal fade" id="interviewDetailsModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Interview Scheduled</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading">Interview Confirmed!</h4>
+                            <p>Your interview has been scheduled successfully.</p>
+                            <hr>
+                            <p class="mb-0" id="interviewDateTime"></p>
+                            <p class="mb-0">You will receive a phone call at the scheduled time.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Application Section -->
+        <div id="application_section">
+            <!-- Top application content -->
+        </div>
+
+        <!-- Interview Status Section -->
+        <div id="interview_status_section">
+            <h3>Check Interview Status</h3>
+            <input type="text" id="interview_id_input" placeholder="Enter Interview ID" />
+            <button onclick="fetchInterviewResult()">Get Result</button>
+            <div id="interview_result_display"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script>
+$(document).ready(function() {
+    $('#uploadForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('file', $('#resumeFile')[0].files[0]);
+        formData.append('name', $('#name').val());
+        formData.append('email', $('#email').val());
+        formData.append('phone', $('#phone').val());
+        formData.append('position', $('#position').val());
+
+        const submitButton = $(this).find('button[type="submit"]');
+        submitButton.prop('disabled', true).text('Processing...');
+
+        $.ajax({
+            url: '/upload_resume/',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                console.log('Response:', response); // Debug logging
+
+                const matchScore = response.match_score || 0;
+                const isSuccess = matchScore >= 0.7;
+
+                $('#uploadResponse').html(`
+                    <div class="alert alert-${isSuccess ? 'success' : 'warning'}">
+                        <h4>${response.message}</h4>
+                        <p>Match Score: ${(matchScore * 100).toFixed(2)}%</p>
+                        ${isSuccess ? 
+                            '<p>Please select your preferred interview slot below.</p>' : 
+                            '<p>We\'ll keep your application on file.</p>'}
+                    </div>
+                `);
+
+                if (isSuccess && response.candidate_id) {
+                    $('#scheduleSection').slideDown();
+                    loadAvailableSlots(response.candidate_id);
+                }
+            },
+            error: function(xhr) {
+                console.error('Error:', xhr); // Debug logging
+                $('#uploadResponse').html(`
+                    <div class="alert alert-danger">
+                        <h4>Error</h4>
+                        <p>${xhr.responseJSON?.detail || 'Failed to submit application'}</p>
+                    </div>
+                `);
+            },
+            complete: function() {
+                submitButton.prop('disabled', false).text('Submit Application');
+            }
+        });
+    });
+
+    // Replace the existing loadAvailableSlots function
+    async function loadAvailableSlots(candidateId) {
+        try {
+            const slotsContainer = $('#slotsContainer');
+            slotsContainer.empty();
+            
+            // Add selection container
+            slotsContainer.append(`
+                <div class="slot-selection mb-4">
+                    <h5>Select Interview Time</h5>
+                    <div class="slots-grid" id="slotsGrid"></div>
+                    <div class="mt-3" id="confirmationArea" style="display: none;">
+                        <div class="alert alert-info">
+                            <strong>Selected Time:</strong> <span id="selectedTime"></span>
+                        </div>
+                        <button id="confirmSlot" class="btn btn-success">
+                            Confirm Interview Time
+                        </button>
+                    </div>
+                </div>
+            `);
+
+            const response = await $.ajax({
+                url: `/api/available-slots/${candidateId}`,
+                method: 'GET'
+            });
+
+            if (response.available_slots && response.available_slots.length > 0) {
+                const slotsGrid = $('#slotsGrid');
+                
+                response.available_slots.forEach(slot => {
+                    const slotButton = $(`
+                        <button class="btn btn-outline-primary m-2 slot-btn" 
+                                data-datetime="${slot.datetime}">
+                            ${slot.formatted}
+                        </button>
+                    `);
+                    
+                    slotButton.click(() => {
+                        // Handle slot selection
+                        $('.slot-btn').removeClass('selected');
+                        slotButton.addClass('selected');
+                        $('#selectedTime').text(slot.formatted);
+                        $('#confirmationArea').slideDown();
+                    });
+                    
+                    slotsGrid.append(slotButton);
+                });
+
+                // Add confirmation button handler
+                $('#confirmSlot').click(async () => {
+                    const selectedDateTime = $('.slot-btn.selected').data('datetime');
+                    if (!selectedDateTime) {
+                        alert('Please select a time slot first');
+                        return;
+                    }
+
+                    try {
+                        const response = await $.ajax({
+                            url: '/api/schedule-interview',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                candidate_id: candidateId,
+                                interview_time: selectedDateTime
+                            })
+                        });
+
+                        if (response.status === 'success') {
+                            $('#slotsContainer').html(`
+                                <div class="alert alert-success">
+                                    <h5>Interview Scheduled!</h5>
+                                    <p>Your interview has been scheduled successfully.</p>
+                                    <p>You will receive a calendar invitation shortly.</p>
+                                </div>
+                            `);
+                        }
+                    } catch (error) {
+                        console.error('Scheduling error:', error);
+                        $('#slotsContainer').html(`
+                            <div class="alert alert-danger">
+                                <p>Failed to schedule interview: ${error.responseJSON?.detail || 'Please try again'}</p>
+                            </div>
+                        `);
+                    }
+                });
+            } else {
+                slotsContainer.html(`
+                    <div class="alert alert-warning">
+                        No available slots found. Please check back later.
+                    </div>
+                `);
+            }
+        } catch (error) {
+            console.error('Error loading slots:', error);
+            $('#slotsContainer').html(`
+                <div class="alert alert-danger">
+                    Failed to load available slots. Please try again.
+                </div>
+            `);
+        }
+    }
+
+    // Rest of your existing calendar and scheduling code...
+});
+
+async function fetchInterviewResult() {
+    const interviewId = document.getElementById("interview_id_input").value;
+    if (!interviewId) {
+        alert("Please enter an Interview ID.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/get_interview_result/?interview_id=${interviewId}`);
+        const result = await response.json();
+        console.log("Fetched Result:", result); // Debugging line
+
+        const resultDisplay = document.getElementById("interview_result_display");
+        if (result.error) {
+            resultDisplay.innerHTML = `<p style="color: red;">${result.error}</p>`;
+        } else {
+            resultDisplay.innerHTML = `
+                <p><strong>Status:</strong> ${result.status}</p>
+                <p><strong>Score:</strong> ${result.score}</p>
+                <p><strong>Category:</strong> ${result.category}</p>
+            `;
+        }
+    } catch (error) {
+        console.error("Error fetching interview result:", error);
+        alert("Failed to fetch interview result.");
+    }
+}
+    </script>
+    <style>
+        /* ...existing styles... */
+        
+        #calendar {
+            margin-top: 20px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .fc-event {
+            cursor: pointer;
+        }
+
+        .fc-timegrid-slot {
+            height: 40px !important;
+        }
+
+        .slots-container {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        .slot-btn {
+            min-width: 200px;
+        }
+
+        .slot-btn:hover {
+            transform: translateY(-2px);
+            transition: transform 0.2s;
+        }
+
+        .slot-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</body>
+</html>
