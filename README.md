@@ -219,19 +219,3 @@ WEBHOOK_URL=https://<your-public-url>/webhook/telnyx
 - Ensure proper access control for the MongoDB database and API keys.
 
 ---
-
-## 📜 License
-
-This project is licensed under the MIT License.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please fork the repository and submit a pull request.
-
----
-
-## 📧 Contact
-
-For any queries, please contact `your-email@example.com`.
